@@ -1,5 +1,110 @@
 #!/bin/bash
 
+
+
+# Update system packages
+sudo dnf update -y
+
+# Install Nginx, MariaDB, PHP, and dependencies
+sudo dnf install -y nginx mariadb mariadb-server php php-fpm php-gd php-mbstring php-xml php-curl php-zip unzip   \
+             wget python3 python3-devel python3-setuptools python3-pip gcc gcc-c++ git php-intl php-imagick \
+             php-opcache php-redis php-apcu php-pecl-apcu-devel
+
+# Start and enable MariaDB and PHP-FPM services
+sudo systemctl start mariadb nginx php-fpm
+sudo systemctl enable mariadb nginx php-fpm
+
+# Configure firewall (replace with your specific rules)
+sudo firewall-cmd --permanent --add-service={http,https}
+sudo firewall-cmd --permanent --add-port=8080/tcp
+sudo firewall-cmd --reload
+
+# Secure MariaDB
+sudo mysql_secure_installation
+
+# Create databases for Odoo and Nextcloud
+sudo mysql -u root -p <<EOF
+CREATE DATABASE odoo;
+CREATE DATABASE nextcloud;
+EOF
+
+# Grant privileges for the databases
+sudo mysql -u root -p <<EOF
+GRANT ALL PRIVILEGES ON odoo.* TO 'odoo'@'localhost' IDENTIFIED BY 'YourOdooPassword';
+GRANT ALL PRIVILEGES ON nextcloud.* TO 'nextcloud'@'localhost' IDENTIFIED BY 'YourNextcloudPassword';
+EOF
+
+# Install Odoo
+# ... (same as previous script for Odoo installation and configuration)
+
+# Install Mattermost
+# ... (same as previous script for Mattermost installation and configuration)
+
+# Install Nextcloud
+# ... (same as previous script for Nextcloud installation and configuration)
+
+# Configure Nginx for Odoo
+sudo nano /etc/nginx/conf.d/odoo.conf
+
+# Paste the following configuration, replacing the paths with your actual installation paths:
+server {
+    listen      8080;
+    server_name odoo.example.com;
+
+    location / {
+        proxy_pass http://localhost:8069;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# Configure Nginx for Mattermost
+sudo nano /etc/nginx/conf.d/mattermost.conf
+
+# Paste the following configuration, replacing the paths with your actual installation paths:
+server {
+    listen      80;
+    server_name mattermost.example.com;
+
+    location / {
+        proxy_pass http://localhost:8065;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Configure Nginx for Nextcloud
+sudo nano /etc/nginx/conf.d/nextcloud.conf
+
+# Paste the following configuration, replacing the paths with your actual installation paths:
+server {
+    listen      80;
+    server_name nextcloud.example.com;
+
+    root /var/www/html/nextcloud;
+    index index.php index.html;
+
+    location / {
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php-fpm/www.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+
+# Restart Nginx to apply configuration changes
+sudo systemctl restart nginx
+
+
+
 # Update system packages
 sudo dnf update -y
 
